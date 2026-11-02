@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>주차별 대시보드 · 쿠팡 / 토스</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --paper:#FBFBF9;
+    --card:#FFFFFF;
+    --ink:#16181A;
+    --muted:#6B7076;
+    --faint:#9AA0A6;
+    --rule:#E4E6E2;
+    --grid:#EEF0EC;
+    --up:#0F7B4F;
+    --down:#C0392B;
+    --toss:#3182F6;
+    --coupang:#C8202A;
+    --m-rev:#2F6FED;
+    --m-profit:#128A5C;
+    --m-ad:#D8622C;
+    --m-roas:#7B5BD6;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;
+    font-size:15px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    font-variant-numeric:tabular-nums;
+  }
+  .wrap{max-width:1000px;margin:0 auto;padding:40px 24px 64px}
+
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:4px}
+  h1{font-size:20px;font-weight:600;letter-spacing:-.02em;margin:0}
+  .period{font-size:13px;color:var(--faint);margin:2px 0 0}
+
+  .basis{display:inline-flex;border:1px solid var(--rule);border-radius:7px;overflow:hidden;background:var(--card)}
+  .basis button{
+    appearance:none;border:0;background:transparent;cursor:pointer;
+    font:inherit;font-size:13px;color:var(--muted);
+    padding:7px 14px;transition:background .12s,color .12s;
+  }
+  .basis button+button{border-left:1px solid var(--rule)}
+  .basis button[aria-pressed="true"]{background:var(--ink);color:#fff}
+
+  nav.tabs{display:flex;gap:28px;border-bottom:1px solid var(--rule);margin:26px 0 28px}
+  nav.tabs button{
+    appearance:none;background:transparent;border:0;cursor:pointer;font:inherit;
+    font-size:16px;font-weight:500;color:var(--faint);
+    padding:0 0 12px;margin-bottom:-1px;
+    border-bottom:2px solid transparent;transition:color .12s;
+  }
+  nav.tabs button[aria-selected="true"]{color:var(--ink)}
+  nav.tabs button[data-ch="toss"][aria-selected="true"]{border-bottom-color:var(--toss)}
+  nav.tabs button[data-ch="coupang"][aria-selected="true"]{border-bottom-color:var(--coupang)}
+  nav.tabs .count{font-size:12px;color:var(--faint);font-weight:400;margin-left:6px}
+
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+  @media (max-width:720px){.grid{grid-template-columns:1fr}.wrap{padding:28px 16px 48px}}
+
+  .panel{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:20px 22px 14px}
+  .panel .name{font-size:13px;color:var(--muted);margin:0}
+  .figure{display:flex;align-items:baseline;gap:10px;margin:6px 0 16px}
+  .figure .val{font-size:27px;font-weight:600;letter-spacing:-.025em;line-height:1.1}
+  .figure .delta{font-size:13px;font-weight:500}
+  .delta.up{color:var(--up)}
+  .delta.down{color:var(--down)}
+  .delta.flat{color:var(--faint)}
+  .plot{position:relative;height:168px}
+
+  .empty{
+    border:1px dashed var(--rule);border-radius:12px;background:var(--card);
+    padding:44px 28px;text-align:center;
+  }
+  .empty p{margin:0 0 18px;color:var(--muted);font-size:14px}
+  textarea{
+    width:100%;min-height:150px;resize:vertical;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.5;
+    color:var(--ink);background:var(--paper);
+    border:1px solid var(--rule);border-radius:8px;padding:12px 14px;
+  }
+  textarea:focus{outline:2px solid var(--ink);outline-offset:-1px}
+  .btn{
+    appearance:none;border:1px solid var(--ink);background:var(--ink);color:#fff;
+    font:inherit;font-size:14px;font-weight:500;padding:9px 20px;border-radius:7px;cursor:pointer;
+    margin-top:12px;
+  }
+  .btn:hover{opacity:.86}
+  .msg{font-size:13px;color:var(--down);margin:10px 0 0;min-height:1.2em}
+
+  details{margin-top:26px}
+  summary{font-size:13px;color:var(--faint);cursor:pointer;list-style:none;padding:6px 0}
+  summary::-webkit-details-marker{display:none}
+  summary:hover{color:var(--muted)}
+  details[open] summary{color:var(--muted)}
+  details .box{border:1px solid var(--rule);border-radius:10px;background:var(--card);padding:18px 20px;margin-top:8px}
+  .hint{font-size:12.5px;color:var(--faint);margin:10px 0 0;line-height:1.7}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>주차별 대시보드</h1>
+      <p class="period" id="period"></p>
+    </div>
+    <div class="basis" role="group" aria-label="비교 기준">
+      <button type="button" id="b-avg" aria-pressed="true">일평균</button>
+      <button type="button" id="b-sum" aria-pressed="false">주간 합계</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="채널">
+    <button type="button" role="tab" data-ch="coupang" aria-selected="true">쿠팡<span class="count" id="cnt-coupang"></span></button>
+    <button type="button" role="tab" data-ch="toss" aria-selected="false">토스<span class="count" id="cnt-toss"></span></button>
+  </nav>
+
+  <section id="board"></section>
+
+  <details>
+    <summary>데이터 붙여넣기 · 교체</summary>
+    <div class="box">
+      <textarea id="paste" spellcheck="false" placeholder="스프레드시트에서 헤더 포함해 복사한 뒤 붙여넣기.
+빈 줄이 주차 구분선입니다."></textarea>
+      <button class="btn" type="button" id="apply">현재 탭에 적용</button>
+      <p class="msg" id="msg"></p>
+      <p class="hint">날짜 · 매출 · 광고비 · 순이익 열을 헤더 이름으로 찾습니다. 순이익은 최종순이익이 있으면 그 값을 씁니다. ROAS는 매출 ÷ 광고비로 다시 계산합니다.</p>
+    </div>
+  </details>
+
+</div>
+
+<script>
+const TOSS_CSV = `날짜,매출,순이익 (광고전),광고비,최종순이익,매출 ROAS
+08/03,"2,682,600","647,135","429,554","217,581",625%
+08/04,"3,091,600","701,122","399,556","301,566",774%
+08/05,"3,569,562","761,039","513,874","247,165",695%
+08/06,"7,386,643","1,309,758","1,011,200","298,558",730%
+08/07,"3,841,400","760,301","653,096","107,205",588%
+08/08,"4,434,100","935,748","954,703","-18,955",464%
+08/09,"4,953,000","1,047,311","1,006,357","40,954",492%
+
+08/10,"6,296,900","1,325,640","1,149,172","176,468",548%
+08/11,"6,355,900","1,239,616","1,163,349","76,267",546%
+08/12,"4,796,600","957,277","860,949","96,328",557%
+08/13,"8,142,900","1,000,841","1,034,340","-33,499",787%
+08/14,"4,407,900","904,458","886,526","17,932",497%
+08/15,"7,279,700","1,335,800","1,372,558","-36,758",530%
+08/16,"7,393,800","1,411,575","1,393,071","18,504",531%
+
+08/17,"3,161,300","494,108",0,"494,108",0%
+08/18,"4,909,900","942,778","889,394","53,384",552%
+08/19,"5,422,400","1,104,929","1,087,010","17,919",499%
+08/20,"4,820,100","929,736","956,191","-26,455",504%
+08/21,"5,806,100","1,097,847","1,137,009","-39,162",511%
+08/22,"6,567,400","1,174,888","1,282,748","-107,860",512%
+08/23,"5,701,600","1,063,849","1,108,016","-44,167",515%
+
+08/24,"5,269,700","958,447","878,922","79,525",600%
+08/25,"5,688,200","989,912","947,419","42,493",600%
+08/26,"9,999,900","1,619,769","1,581,239","38,530",632%
+08/27,"7,194,400","1,147,412","981,696","165,716",733%
+08/28,"4,832,000","1,082,247","771,089","311,158",627%
+08/29,"5,972,400","1,354,131","999,786","354,345",597%
+08/30,"6,303,500","1,440,420","1,137,385","303,035",554%
+
+08/31,"5,617,600","1,260,838","987,854","272,984",569%
+09/01,"6,811,600","1,542,099","1,150,121","391,978",592%
+09/02,"7,409,300","1,690,939","1,266,282","424,657",585%
+09/03,"6,707,200","1,530,362","1,126,952","403,410",595%
+09/04,"5,560,700","1,315,852","969,230","346,622",574%
+09/05,"5,794,200","1,372,665","1,005,676","366,989",576%
+09/06,"8,793,900","1,851,292","1,351,595","499,697",651%
+
+09/07,"6,764,500","1,608,534","1,159,865","448,669",583%
+09/08,"6,584,800","1,588,996","1,168,601","420,395",563%
+09/09,"6,499,000","1,535,253","1,068,172","467,081",608%
+09/10,"12,337,550","2,792,643","1,594,674","1,197,969",774%
+09/11,"5,899,660","1,383,016","1,047,429","335,587",563%
+09/12,"4,598,110","1,108,436","777,515","330,921",591%
+09/13,"6,275,230","1,480,992","1,062,298","418,694",591%
+
+09/14,"12,404,440","2,427,975","1,653,542","774,433",750%
+09/15,"6,746,560","1,600,543","1,111,704","488,839",607%
+09/16,"6,648,110","1,670,709","1,165,853","504,856",570%
+09/17,"4,552,700","1,348,506","843,588","504,918",540%
+09/18,"2,515,700","794,679","434,228","360,451",579%
+09/19,"4,044,300","1,105,482","557,130","548,352",726%
+09/20,"3,724,000","1,136,519","704,849","431,670",528%
+
+09/21,"2,359,300","606,184","414,196","191,988",570%
+09/22,"838,200","238,463","221,501","16,962",378%
+09/23,"638,800","210,182","146,873","63,309",435%
+09/24,"736,700","241,506","124,676","116,830",591%
+09/25,"490,400","164,408","93,316","71,092",526%
+09/26,"927,700","307,066","167,337","139,729",554%
+09/27,"3,085,600","871,810","285,062","586,748",1082%
+
+09/28,"1,417,000","411,010","196,594","214,416",721%
+09/29,"1,867,500","468,528","338,898","129,630",551%
+09/30,"2,242,400","553,542","396,379","157,163",566%
+10/01,"3,145,700","645,932","463,722","182,210",678%
+10/02,"2,449,000","586,532","481,834","104,698",508%
+10/03,"2,585,900","691,512","502,790","188,722",514%
+10/04,"3,093,600","739,479","564,140","175,339",548%
+
+10/05,"3,419,800","779,787","586,995","192,792",583%
+10/06,"2,404,400","557,103","470,371","86,732",511%
+10/07,"2,528,300","584,615","500,982","83,633",505%
+10/08,"2,792,200","639,525","499,514","140,011",559%
+10/09,"2,985,200","706,975","538,527","168,448",554%
+10/10,"2,335,300","524,133","488,782","35,351",478%
+10/11,"2,993,400","686,317","576,679","109,638",519%
+
+10/12,"5,230,200","1,012,644","959,029","53,615",545%
+10/13,"3,015,900","676,266","581,002","95,264",519%
+10/14,"4,190,000","890,275","835,493","54,782",502%
+10/15,"2,705,600","678,276","615,101","63,175",440%
+10/16,"2,688,500","682,825","551,453","131,372",488%
+10/17,"2,360,100","607,816","517,076","90,740",456%
+10/18,"2,692,200","728,206","626,424","101,782",430%
+
+10/19,"2,967,000","780,116","622,922","157,194",476%
+10/20,"3,237,600","827,695","639,950","187,745",506%
+10/21,"3,378,300","851,665","688,809","162,856",490%
+10/22,"2,234,500","596,667","504,391","92,276",443%
+10/23,"2,077,300","479,868","369,998","109,870",561%
+10/24,"2,869,200","662,199","544,719","117,480",527%
+10/25,"3,074,200","707,232","522,177","185,055",589%
+
+10/26,"2,248,300","525,685","354,097","171,588",635%
+10/27,"1,985,500","481,911","335,596","146,315",592%
+10/28,"15,075,200","2,206,897","1,159,478","1,047,419",1300%
+10/29,"2,749,500","671,493","515,591","155,902",533%
+10/30,"3,396,800","833,628","491,130","342,498",692%
+10/31,"2,047,300","508,248","390,168","118,080",525%
+11/01,"2,736,200","630,192","400,131","230,061",684%`;
+
+const COUPANG_CSV = `날짜,매출,순이익,광고비 (vat포함),매출 ROAS
+08/03,"13,872,000","626,924","2,042,262",679%
+08/04,"13,360,500","174,534","2,436,303",548%
+08/05,"11,189,020","246,163","1,914,661",584%
+08/06,"11,430,640","336,980","1,931,576",592%
+08/07,"12,577,220","-156,491","2,627,815",479%
+08/08,"12,167,980","-230,387","2,641,544",461%
+08/09,"13,289,960","-71,744","2,695,010",493%
+
+08/10,"13,104,160","36,056","2,583,240",507%
+08/11,"20,129,180","1,238,921","2,704,241",744%
+08/12,"18,487,120","811,542","2,521,989",733%
+08/13,"12,576,560","-87,801","2,574,074",489%
+08/14,"8,949,980","-387,650","2,154,904",415%
+08/15,"11,809,120","93,186","2,223,962",531%
+08/16,"12,871,940","-59,777","2,568,924",501%
+
+08/17,"13,101,100","-251,089","2,765,533",474%
+08/18,"11,887,400","-141,404","2,426,389",490%
+08/19,"12,300,540","-136,606","2,530,926",486%
+08/20,"13,211,780","399,371","2,260,320",585%
+08/21,"10,231,240","-36,243","2,223,126",460%
+08/22,"11,990,160","85,435","2,405,172",499%
+08/23,"12,599,660","203,846","2,399,549",525%
+
+08/24,"14,003,460","257,986","2,552,466",549%
+08/25,"15,501,560","1,093,517","2,106,606",736%
+08/26,"13,806,300","462,637","2,254,201",612%
+08/27,"12,243,740","669,731","1,839,723",666%
+08/28,"11,932,900","772,570","1,700,398",702%
+08/29,"12,224,540","771,531","1,709,092",715%
+08/30,"11,863,060","719,510","1,706,965",695%
+
+08/31,"14,936,920","1,360,523","1,749,306",854%
+09/01,"19,612,520","1,279,417","2,400,093",817%
+09/02,"21,095,140","454,885","2,579,306",818%
+09/03,"15,277,300","375,978","2,562,964",596%
+09/04,"14,076,540","298,689","2,283,943",616%
+09/05,"14,179,600","488,368","2,051,551",691%
+09/06,"16,766,040","881,791","2,155,644",778%
+
+09/07,"17,717,920","431,738","2,735,820",648%
+09/08,"17,306,660","36,890","3,102,191",558%
+09/09,"18,659,000","785,030","2,702,420",690%
+09/10,"17,888,140","659,897","2,676,782",668%
+09/11,"16,580,100","381,899","2,702,400",614%
+09/12,"16,459,500","636,422","2,476,038",665%
+09/13,"18,018,940","603,999","2,709,164",665%
+
+09/14,"23,878,140","1,110,532","3,344,504",714%
+09/15,"28,353,520","1,132,096","4,122,923",688%
+09/16,"39,229,280","3,130,191","4,295,330",913%
+09/17,"23,916,500","186,632","4,173,335",573%
+09/18,"14,945,480","-67,077","2,906,199",514%
+09/19,"12,820,200","332,491","1,934,216",663%
+09/20,"13,121,200","275,749","2,088,380",628%
+
+09/21,"10,732,940","-218,438","2,270,818",473%
+09/22,"4,853,040","115,772","830,825",584%
+09/23,"3,706,020","247,748","477,609",776%
+09/24,"3,166,820","184,543","429,385",738%
+09/25,"3,684,560","207,680","439,900",838%
+09/26,"4,233,460","308,230","472,808",895%
+09/27,"6,142,280","581,503","532,639",1153%
+
+09/28,"6,786,300","365,521","967,060",702%
+09/29,"6,919,620","5,981","1,325,264",522%
+09/30,"9,325,520","429,199","1,347,094",692%
+10/01,"11,930,720","706,650","1,525,907",782%
+10/02,"11,024,960","609,106","1,650,168",668%
+10/03,"8,769,220","233,121","1,547,627",567%
+10/04,"8,569,800","115,751","1,673,538",512%
+
+10/05,"10,014,100","349,603","1,793,928",558%
+10/06,"10,284,980","437,404","1,756,561",586%
+10/07,"10,535,380","293,561","1,952,752",540%
+10/08,"9,648,900","338,752","1,603,164",602%
+10/09,"9,013,080","300,215","1,609,254",560%
+10/10,"7,502,000","193,551","1,358,103",552%
+10/11,"9,443,200","569,703","1,420,955",665%
+
+10/12,"11,688,160","800,112","1,655,464",706%
+10/13,"11,189,100","664,767","1,719,216",651%
+10/14,"10,539,280","534,465","1,795,830",587%
+10/15,"10,338,780","529,479","1,718,028",602%
+10/16,"8,945,540","260,330","1,702,308",525%
+10/17,"10,193,200","492,699","1,699,926",600%
+10/18,"10,778,380","523,459","1,804,517",597%
+
+10/19,"11,841,560","815,371","1,687,998",702%
+10/20,"12,257,720","873,922","1,732,396",708%
+10/21,"11,400,500","580,617","1,827,175",624%
+10/22,"9,413,260","287,050","1,728,388",545%
+10/23,"8,316,780","371,785","1,412,352",589%
+10/24,"8,911,600","354,678","1,502,848",593%
+10/25,"10,075,040","538,133","1,582,178",637%
+
+10/26,"10,924,980","848,972","1,484,381",736%
+10/27,"9,413,580","534,407","1,484,381",634%
+10/28,"9,357,680","683,778","1,341,673",697%
+10/29,"8,393,900","620,111","1,235,279",680%
+10/30,"7,877,340","607,860","1,171,633",672%
+10/31,"7,719,600","518,368","1,235,094",625%
+11/01,"10,605,660","1,073,054","1,282,096",827%`;
+
+const METRICS = [
+  {key:'revenue', name:'매출',        color:'#2F6FED', kind:'won'},
+  {key:'profit',  name:'최종순이익',   color:'#128A5C', kind:'won'},
+  {key:'ad',      name:'광고비',      color:'#D8622C', kind:'won'},
+  {key:'roas',    name:'매출 ROAS',   color:'#7B5BD6', kind:'pct'}
+];
+
+function splitRow(line){
+  const out=[]; let cur='', q=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){ if(q && line[i+1]==='"'){cur+='"';i++;} else q=!q; }
+    else if(c===',' && !q){ out.push(cur); cur=''; }
+    else cur+=c;
+  }
+  out.push(cur);
+  return out.map(s=>s.trim());
+}
+
+function num(s){
+  if(s===undefined||s===null) return 0;
+  const v=parseFloat(String(s).replace(/[",\s원%]/g,''));
+  return isFinite(v)?v:0;
+}
+
+function findCols(header){
+  const h=header.map(x=>x.replace(/\s/g,''));
+  const idx=(test)=>h.findIndex(test);
+  const date=idx(x=>/날짜|일자|date/i.test(x));
+  const rev=idx(x=>/매출/.test(x) && !/roas/i.test(x));
+  const ad=idx(x=>/광고비|광고금액|광고집행/.test(x));
+  let profit=idx(x=>/최종순이익|최종이익/.test(x));
+  if(profit<0) profit=idx(x=>/순이익|순익/.test(x) && !/광고전/.test(x));
+  if(profit<0) profit=idx(x=>/순이익|순익|마진/.test(x));
+  return {date, rev, ad, profit};
+}
+
+function parse(csv){
+  const lines=csv.replace(/\r/g,'').split('\n');
+  let hi=0;
+  while(hi<lines.length && !lines[hi].trim().replace(/,/g,'')) hi++;
+  const head=splitRow(lines[hi]);
+  const cols=findCols(head);
+  if(cols.rev<0||cols.ad<0||cols.profit<0) throw new Error('매출 · 광고비 · 순이익 열을 찾지 못했습니다. 헤더를 포함해 붙여넣어 주세요.');
+
+  const weeks=[]; let cur=null;
+  for(let i=hi+1;i<lines.length;i++){
+    const raw=lines[i];
+    if(!raw.trim().replace(/[,\s]/g,'')){ cur=null; continue; }
+    const c=splitRow(raw);
+    const label=(c[cols.date]||'').trim();
+    if(!label) { cur=null; continue; }
+    if(!cur){ cur={days:[],revenue:0,ad:0,profit:0}; weeks.push(cur); }
+    cur.days.push(label);
+    cur.revenue+=num(c[cols.rev]);
+    cur.ad+=num(c[cols.ad]);
+    cur.profit+=num(c[cols.profit]);
+  }
+  if(!weeks.length) throw new Error('데이터 행을 찾지 못했습니다.');
+  weeks.forEach((w,i)=>{
+    w.n=w.days.length;
+    w.from=w.days[0];
+    w.to=w.days[w.days.length-1];
+    w.index=i+1;
+    w.roas=w.ad>0 ? (w.revenue/w.ad*100) : null;
+  });
+  weeks.profitLabel=(head[cols.profit]||'순이익').trim();
+  return weeks;
+}
+
+const state={
+  basis:'avg',
+  channel:'coupang',
+  data:{ coupang:parse(COUPANG_CSV), toss:parse(TOSS_CSV) },
+  charts:[]
+};
+
+function value(w,key){
+  if(key==='roas') return w.roas;
+  const raw=w[key==='revenue'?'revenue':key==='profit'?'profit':'ad'];
+  return state.basis==='avg' ? raw/w.n : raw;
+}
+
+const fmtWon=v=>{
+  if(v===null) return '—';
+  const a=Math.abs(v);
+  if(a>=100000000) return (v/100000000).toFixed(2)+'억';
+  if(a>=10000) return (v/10000).toFixed(a>=1000000?0:1)+'만';
+  return Math.round(v).toLocaleString();
+};
+const fmtVal=(v,kind)=> v===null ? '—' : (kind==='pct' ? Math.round(v)+'%' : fmtWon(v)+'원');
+const fmtExact=(v,kind)=> v===null ? '—' : (kind==='pct' ? Math.round(v)+'%' : Math.round(v).toLocaleString()+'원');
+const fmtAxis=(v,kind)=> kind==='pct' ? Math.round(v)+'%' : fmtWon(v);
+
+function deltaHTML(cur,prev,kind){
+  if(cur===null||prev===null||prev===0) return '<span class="delta flat">—</span>';
+  if(kind==='pct'){
+    const d=Math.round(cur-prev);
+    const cls=d>0?'up':d<0?'down':'flat';
+    return '<span class="delta '+cls+'">전주 '+(d>0?'+':'')+d+'%p</span>';
+  }
+  const pct=(cur-prev)/Math.abs(prev)*100;
+  const cls=pct>0?'up':pct<0?'down':'flat';
+  const shown=Math.abs(pct)>=1000 ? (pct>0?'+':'')+Math.round(pct/100)/10+'배' : (pct>0?'+':'')+pct.toFixed(1)+'%';
+  return '<span class="delta '+cls+'">전주 '+shown+'</span>';
+}
+
+function hexa(hex,a){
+  const n=parseInt(hex.slice(1),16);
+  return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';
+}
+
+function render(){
+  state.charts.forEach(c=>c.destroy());
+  state.charts=[];
+
+  const weeks=state.data[state.channel];
+  const board=document.getElementById('board');
+  document.getElementById('cnt-toss').textContent=state.data.toss?'· '+state.data.toss.length+'주':'';
+  document.getElementById('cnt-coupang').textContent=state.data.coupang?'· '+state.data.coupang.length+'주':'';
+
+  if(!weeks){
+    document.getElementById('period').textContent='';
+    board.innerHTML='<div class="empty"><p>'+(state.channel==='coupang'?'쿠팡':'토스')+' 데이터가 아직 없습니다. 아래 붙여넣기 영역에 시트를 그대로 넣으면 그래프가 그려집니다.</p></div>';
+    return;
+  }
+
+  const first=weeks[0], last=weeks[weeks.length-1];
+  const anyPartial=weeks.some(w=>w.n<7);
+  document.getElementById('period').textContent=
+    first.from+' – '+last.to+' · '+weeks.length+'개 주차 '+weeks.reduce((s,w)=>s+w.n,0)+'일 · '+
+    '큰 숫자는 기간 전체 '+(state.basis==='avg'?'일평균':'합계')+
+    (anyPartial?' · * 표시는 7일 미만 주차':'');
+
+  const labels=weeks.map(w=>w.index+'주'+(w.n<7?'*':''));
+  const partial=weeks.map(w=>w.n<7);
+  const sub=weeks.map(w=>w.from+'~'+w.to.slice(-2)+(w.n<7?' ('+w.n+'일)':''));
+
+  const totalDays=weeks.reduce((s,w)=>s+w.n,0);
+  const totals={
+    revenue:weeks.reduce((s,w)=>s+w.revenue,0),
+    profit:weeks.reduce((s,w)=>s+w.profit,0),
+    ad:weeks.reduce((s,w)=>s+w.ad,0)
+  };
+  totals.roas = totals.ad>0 ? totals.revenue/totals.ad*100 : null;
+  const overall=(key)=>{
+    if(key==='roas') return totals.roas;
+    const raw=totals[key];
+    return state.basis==='avg' ? raw/totalDays : raw;
+  };
+
+  board.innerHTML='<div class="grid">'+METRICS.map((m,i)=>{
+    const nm=(m.key==='profit' && weeks.profitLabel) ? weeks.profitLabel : m.name;
+    const series=weeks.map(w=>value(w,m.key));
+    const cur=series[series.length-1];
+    const head=overall(m.key);
+    return '<div class="panel">'+
+      '<p class="name">'+nm+' · '+(m.kind==='pct'?'기간 전체':(state.basis==='avg'?'일평균':'기간 합계'))+'</p>'+
+      '<div class="figure"><span class="val" style="color:'+m.color+'">'+fmtExact(head,m.kind)+'</span>'+
+      '<span class="delta flat">최근 '+last.index+'주 '+fmtExact(cur,m.kind)+'</span></div>'+
+      '<div class="plot"><canvas id="c'+i+'" role="img" aria-label="'+nm+' 주차별 추이"></canvas></div>'+
+    '</div>';
+  }).join('')+'</div>';
+
+  METRICS.forEach((m,i)=>{
+    const series=weeks.map(w=>value(w,m.key));
+    void weeks.profitLabel;
+    state.charts.push(new Chart(document.getElementById('c'+i),{
+      type:'line',
+      data:{labels:labels,datasets:[{
+        data:series,
+        borderColor:m.color,
+        backgroundColor:hexa(m.color,0.09),
+        borderWidth:2,tension:.3,fill:true,spanGaps:true,
+        segment:{borderDash:ctx=>partial[ctx.p1DataIndex]?[5,4]:undefined},
+        pointRadius:5,
+        pointBackgroundColor:weeks.map(w=>w.n<7?'#FFFFFF':m.color),
+        pointBorderColor:weeks.map(w=>w.n<7?m.color:'#fff'),
+        pointBorderWidth:2,pointHoverRadius:7
+      }]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        animation:{duration:280},
+        plugins:{
+          legend:{display:false},
+          tooltip:{
+            backgroundColor:'#16181A',padding:10,cornerRadius:6,displayColors:false,
+            titleFont:{family:'Pretendard',size:12,weight:'500'},
+            bodyFont:{family:'Pretendard',size:13},
+            callbacks:{
+              title:(items)=>sub[items[0].dataIndex],
+              label:(c)=>fmtVal(c.parsed.y,m.kind)
+            }
+          }
+        },
+        scales:{
+          x:{ticks:{color:'#9AA0A6',font:{family:'Pretendard',size:11},autoSkip:false,maxRotation:0},grid:{display:false},border:{color:'#E4E6E2'}},
+          y:{ticks:{color:'#9AA0A6',font:{family:'Pretendard',size:11},maxTicksLimit:5,callback:v=>fmtAxis(v,m.kind)},grid:{color:'#EEF0EC'},border:{display:false}}
+        }
+      }
+    }));
+  });
+}
+
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected', b===btn?'true':'false'));
+    state.channel=btn.dataset.ch;
+    document.getElementById('msg').textContent='';
+    render();
+  });
+});
+
+document.getElementById('b-avg').addEventListener('click',()=>setBasis('avg'));
+document.getElementById('b-sum').addEventListener('click',()=>setBasis('sum'));
+function setBasis(b){
+  state.basis=b;
+  document.getElementById('b-avg').setAttribute('aria-pressed',String(b==='avg'));
+  document.getElementById('b-sum').setAttribute('aria-pressed',String(b==='sum'));
+  render();
+}
+
+document.getElementById('apply').addEventListener('click',()=>{
+  const msg=document.getElementById('msg');
+  const text=document.getElementById('paste').value;
+  if(!text.trim()){ msg.textContent='붙여넣은 내용이 없습니다.'; return; }
+  try{
+    state.data[state.channel]=parse(text);
+    msg.textContent='';
+    render();
+  }catch(e){
+    msg.textContent=e.message;
+  }
+});
+
+render();
+</script>
+</body>
+</html>
